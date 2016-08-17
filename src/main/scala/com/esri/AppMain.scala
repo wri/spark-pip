@@ -4,13 +4,13 @@ import com.vividsolutions.jts.geom._
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory
 import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Logging, SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable
 
 /**
   */
-object AppMain extends App with Logging {
+object AppMain extends App {
 
   val sparkConf = new SparkConf()
     .setAppName("Spark PiP")
@@ -128,7 +128,5 @@ object AppMain extends App with Logging {
     sc.stop()
   }
   val t2 = System.currentTimeMillis()
-
-  log.info("Processing time %d sec".format((t2 - t1) / 1000))
 
 }
