@@ -1,12 +1,10 @@
-package com.esri
+package com.esri 
+import com.vividsolutions.jts.geom._ 
+import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory 
+import org.apache.spark.{SparkConf, SparkContext} 
+import org.geotools.geometry.jts.WKTReader2 
 
-import com.vividsolutions.jts.geom._
-import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory
-import org.apache.spark.{Logging, SparkConf, SparkContext}
-import org.geotools.geometry.jts.WKTReader2
-
-object MainApp extends App with Logging {
-
+object MainApp extends App {
   val sparkConf = new SparkConf()
     .setAppName("Spark PiP")
     .registerKryoClasses(Array(
@@ -17,28 +15,35 @@ object MainApp extends App with Logging {
       classOf[Polygon],
       classOf[RowCol]
     ))
+	
+  def matchTest(x: String): Int = x.toInt match {
+    case x if x <= 10 => 0
+    case x if x <= 15 => 10
+    case x if x <= 20 => 15
+    case x if x <= 25 => 20
+    case x if x <= 30 => 25
+    case x if x <= 50 => 30
+    case x if x <= 75 => 50
+    case x if x <= 100 => 75
+    case _ => -9999
+  }
 
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
-
   val sc = new SparkContext(sparkConf)
   try {
     val conf = sc.getConf
-
     val geomFact = new GeometryFactory(new PrecisionModel(conf.getDouble("geometry.precision", 1000000.0)))
-
     val minLon = conf.getDouble("extent.xmin", -180.0)
     val maxLon = conf.getDouble("extent.xmax", 180.0)
     val minLat = conf.getDouble("extent.ymin", -90.0)
     val maxLat = conf.getDouble("extent.ymax", 90.0)
     val envp = new Envelope(minLon, maxLon, minLat, maxLat)
-
     val pointSep = conf.get("points.sep", "\t")
     val pointLon = conf.getInt("points.x", 0)
     val pointLat = conf.getInt("points.y", 1)
     val pointIdx = conf.get("points.fields", "").split(',').map(_.toInt)
     val reduceSize = conf.getDouble("reduce.size", 1.0)
-
     val pointRDD = sc
       .textFile(conf.get("points.path"))
       .flatMap(line => {
@@ -55,17 +60,14 @@ object MainApp extends App with Logging {
         }
         catch {
           case t: Throwable => {
-            log.error(t.toString)
             None
           }
         }
       })
       .flatMap(_.toRowCols(reduceSize))
-
     val polygonSep = conf.get("polygons.sep", "\t")
     val polygonWKT = conf.getInt("polygons.wkt", 0)
     val polygonIdx = conf.get("polygons.fields", "").split(',').map(_.toInt)
-
     val polygonRDD = sc
       .textFile(conf.get("polygons.path"))
       .mapPartitions(iter => {
@@ -81,16 +83,13 @@ object MainApp extends App with Logging {
           }
           catch {
             case t: Throwable => {
-              log.error(t.toString)
               None
             }
           }
         })
       })
       .flatMap(_.toRowCols(reduceSize))
-
     val outputSep = conf.get("output.sep", "\t")
-
     pointRDD
       .cogroup(polygonRDD)
       .mapPartitions(iter => {
@@ -114,9 +113,11 @@ object MainApp extends App with Logging {
           }
         }
       })
-      .map(_.mkString(outputSep))
+      .map({case Array(lon, lat, thresh, area, iso, id1, id2) => ((iso, id1, id2, matchTest(thresh)), (area.toDouble)) })
+      .reduceByKey(_+_)
+      .map({ case (key, value) => Array(key._1, key._2, key._3, key._4, value)
+	  .mkString(",")})
       .saveAsTextFile(conf.get("output.path"))
-
   } finally {
     sc.stop()
   }
