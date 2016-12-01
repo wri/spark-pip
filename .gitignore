@@ -1,13 +1,5 @@
-*.class
-*.log
-*.iml
-
-# sbt specific
-.cache
-.history
-.lib/
-dist/*
 target/
+<<<<<<< HEAD
 lib_managed/
 src_managed/
 project/boot/
@@ -20,3 +12,9 @@ project/plugins/project/
 .idea
 
 data/
+=======
+.idea/
+src/main/python/*.xml
+dependency-reduced-pom.xml
+*.iml
+>>>>>>> upstream/master
