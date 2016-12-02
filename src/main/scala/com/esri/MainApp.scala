@@ -90,8 +90,7 @@ object MainApp extends App {
       })
       .flatMap(_.toRowCols(reduceSize))
     val outputSep = conf.get("output.sep", "\t")
-
-    val finalRDD = pointRDD
+    pointRDD
       .cogroup(polygonRDD)
       .mapPartitions(iter => {
         val preparedGeometryFactory = new PreparedGeometryFactory()
@@ -114,8 +113,6 @@ object MainApp extends App {
           }
         }
       })
-
-    finalRDD
       .map({case Array(lon, lat, thresh, area, iso, id1, id2) => ((iso, id1, id2, matchTest(thresh)), (area.toDouble)) })
       .reduceByKey(_+_)
       .map({ case (key, value) => Array(key._1, key._2, key._3, key._4, value)
