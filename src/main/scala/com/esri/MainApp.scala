@@ -4,6 +4,7 @@ import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory
 import org.apache.spark.{SparkConf, SparkContext} 
 import org.geotools.geometry.jts.WKTReader2 
 
+
 object MainApp extends App {
   val sparkConf = new SparkConf()
     .setAppName("Spark PiP")
@@ -15,6 +16,8 @@ object MainApp extends App {
       classOf[Polygon],
       classOf[RowCol]
     ))
+
+  
 	
   def matchTest(x: String): Int = x.toInt match {
     case x if x <= 10 => 0
@@ -28,9 +31,15 @@ object MainApp extends App {
     case _ => -9999
   }
 
+  case class TableRow(iso: String, id1: String, id2: String, thresh: Long, area: Double)
+
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
   val sc = new SparkContext(sparkConf)
+  val sqlContext= new org.apache.spark.sql.SQLContext(sc)
+  import sqlContext.implicits._
+  import org.apache.spark.sql.functions._
+
   try {
     val conf = sc.getConf
     val geomFact = new GeometryFactory(new PrecisionModel(conf.getDouble("geometry.precision", 1000000.0)))
@@ -113,11 +122,13 @@ object MainApp extends App {
           }
         }
       })
-      .map({case Array(lon, lat, thresh, area, iso, id1, id2) => ((iso, id1, id2, matchTest(thresh)), (area.toDouble)) })
-      .reduceByKey(_+_)
-      .map({ case (key, value) => Array(key._1, key._2, key._3, key._4, value)
-	  .mkString(",")})
-      .saveAsTextFile(conf.get("output.path"))
+      .map({case Array(lon, lat, thresh, area, iso, id1, id2) => (TableRow(iso, id1, id2, matchTest(thresh), area.toDouble)) })
+      .toDF()
+      .groupBy("iso", "id1", "id2", "thresh").agg(sum("area").alias("area_out"))
+      .write
+      .format("csv")
+      .save(conf.get("output.path"))
+
   } finally {
     sc.stop()
   }
