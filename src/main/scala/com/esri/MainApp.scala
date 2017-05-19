@@ -31,7 +31,9 @@ object MainApp extends App {
     case _ => -9999
   }
 
-  case class TableRow(iso: String, id1: String, id2: String, thresh: Long, area: Double)
+  def biomass_per_pixel(biomass: String)(area: String): Double = biomass.toDouble * area.toDouble / 10000.0
+
+  case class TableRow(poly_id_field: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
 
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
@@ -122,9 +124,9 @@ object MainApp extends App {
           }
         }
       })
-      .map({case Array(lon, lat, thresh, area, iso, id1, id2) => (TableRow(iso, id1, id2, matchTest(thresh), area.toDouble)) })
+      .map({case Array(lon, lat, year, area, thresh, biomass, poly_id_field, iso, id1, id2) => (TableRow(poly_id_field, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
       .toDF()
-      .groupBy("iso", "id1", "id2", "thresh").agg(sum("area").alias("area_out"))
+      .groupBy("poly_id_field", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
       .write
       .format("csv")
       .save(conf.get("output.path"))
