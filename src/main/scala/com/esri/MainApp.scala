@@ -16,7 +16,14 @@ object MainApp extends App {
       classOf[RowCol]
     ))
 
-  
+
+  val propFileName = if (args.length == 0) "application.properties" else args(0)
+  AppProperties.loadProperties(propFileName, sparkConf)
+  val sc = new SparkContext(sparkConf)
+  val sqlContext= new org.apache.spark.sql.SQLContext(sc)
+  import sqlContext.implicits._
+  import org.apache.spark.sql.functions._
+
 	
   def matchTest(x: String): Int = x.toInt match {
     case x if x <= 10 => 0
@@ -32,19 +39,35 @@ object MainApp extends App {
 
   def biomass_per_pixel(biomass: String)(area: String): Double = biomass.toDouble * area.toDouble / 10000.0
 
+  def save_multi_df ( df:org.apache.spark.sql.DataFrame, combo:Array[Any] ) = {
+
+   // filter source df to only have those polyids
+   val filtered = df.filter($"polyid" === combo(0) || $"polyid" === combo(1))
+
+     // grouping that filtered df by lat/lon/iso/adm1/adm2
+     .groupBy("lat", "lon", "polyid", "iso", "id1", "id2", "thresh", "year", "area", "biomass").count()
+   
+   // filtering where we have 2 or more records (e.g. points have both primary forest & wdpa)
+   val count_gr_1 = filtered.filter($"count" > 1)
+
+   if (!(count_gr_1.rdd.isEmpty)) {
+
+     // then group to remove lat and lon, then save
+     count_gr_1.groupBy("iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
+     .write
+     .format("csv")
+     .save(combo(0) + "_" + combo(1))
+   }
+
+  }
+
   // I'm sure there's a better way to do this
   // but all the examples I've found use case classes to go from RDD -> DataFrame
   case class Extent4Row(poly_id_field: String, iso: String, id1: String, id2: String, thresh: Long, area: Double)
   case class ExtentRow(iso: String, id1: String, id2: String, thresh: Long, area: Double)
   case class Points4Row(poly_id_field: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
-  case class PointsRow(iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
+  case class PointsRow(lon: String, lat: String, polyid: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
 
-  val propFileName = if (args.length == 0) "application.properties" else args(0)
-  AppProperties.loadProperties(propFileName, sparkConf)
-  val sc = new SparkContext(sparkConf)
-  val sqlContext= new org.apache.spark.sql.SQLContext(sc)
-  import sqlContext.implicits._
-  import org.apache.spark.sql.functions._
 
   try {
     val conf = sc.getConf
@@ -130,48 +153,17 @@ object MainApp extends App {
         }
       })
 
-  // Can't wait until I write halfway decent scala code
-  // And look back at this and wonder what the heck I was thinking
-  if(conf.get("analysis.type") == "extent") {
-    if (polygonIdx.length == 4){
-      val df = with_poly.map({case Array(lon, lat, thresh, area, poly_id_field, iso, id1, id2) => (Extent4Row(poly_id_field, iso, id1, id2, matchTest(thresh), area.toDouble)) })
-                        .toDF()
-                        .groupBy("poly_id_field", "iso", "id1", "id2", "thresh").agg(sum("area"))
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
+  val df = with_poly.map({case Array(lon, lat, year, area, thresh, biomass, polyid, iso, id1, id2) => (PointsRow(lon, lat, polyid, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
+                    .toDF()
 
-     } else {
-      val df = with_poly.map({case Array(lon, lat, thresh, area, iso, id1, id2) => (ExtentRow(iso, id1, id2, matchTest(thresh), area.toDouble)) })
-                        .toDF()
-                        .groupBy("iso", "id1", "id2", "thresh").agg(sum("area"))
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
-     }
+  val unique_polyids = df.groupBy("polyid").count().select("polyid").rdd.map(r => r(0)).collect()
+  val combos = unique_polyids.combinations(2).toList
 
-  } else {
-    if (polygonIdx.length == 4){
-      val df = with_poly.map({case Array(lon, lat, year, area, thresh, biomass, poly_id_field, iso, id1, id2) => (Points4Row(poly_id_field, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
-                        .toDF()
-                        .groupBy("poly_id_field", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))      
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
+  combos.map(t => save_multi_df(df, t))    
 
-
-    } else {
-      val df = with_poly.map({case Array(lon, lat, year, area, thresh, biomass, iso, id1, id2) => (PointsRow(iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
-                        .toDF()
-                        .groupBy("iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
-
-    }
-  }
 
   } finally {
     sc.stop()
   }
 }
+
