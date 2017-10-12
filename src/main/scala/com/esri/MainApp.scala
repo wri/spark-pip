@@ -34,10 +34,8 @@ object MainApp extends App {
 
   // I'm sure there's a better way to do this
   // but all the examples I've found use case classes to go from RDD -> DataFrame
-  case class Extent4Row(poly_id_field: String, iso: String, id1: String, id2: String, thresh: Long, area: Double)
-  case class ExtentRow(iso: String, id1: String, id2: String, thresh: Long, area: Double)
-  case class Points4Row(poly_id_field: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
-  case class PointsRow(iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
+  case class ExtentRow( polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, thresh: Long, area: Double)
+  case class LossRow(polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
 
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
@@ -133,43 +131,23 @@ object MainApp extends App {
   // Can't wait until I write halfway decent scala code
   // And look back at this and wonder what the heck I was thinking
   if(conf.get("analysis.type") == "extent") {
-    if (polygonIdx.length == 4){
-      val df = with_poly.map({case Array(lon, lat, thresh, area, poly_id_field, iso, id1, id2) => (Extent4Row(poly_id_field, iso, id1, id2, matchTest(thresh), area.toDouble)) })
+      val df = with_poly.map({case Array(thresh, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (ExtentRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, matchTest(thresh), area.toDouble)) })
                         .toDF()
-                        .groupBy("poly_id_field", "iso", "id1", "id2", "thresh").agg(sum("area"))
+                        .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh").agg(sum("area"))
                         .write
                         .format("csv")
                         .save(conf.get("output.path"))
-
-     } else {
-      val df = with_poly.map({case Array(lon, lat, thresh, area, iso, id1, id2) => (ExtentRow(iso, id1, id2, matchTest(thresh), area.toDouble)) })
-                        .toDF()
-                        .groupBy("iso", "id1", "id2", "thresh").agg(sum("area"))
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
-     }
-
-  } else {
-    if (polygonIdx.length == 4){
-      val df = with_poly.map({case Array(lon, lat, year, area, thresh, biomass, poly_id_field, iso, id1, id2) => (Points4Row(poly_id_field, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
-                        .toDF()
-                        .groupBy("poly_id_field", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))      
-                        .write
-                        .format("csv")
-                        .save(conf.get("output.path"))
-
 
     } else {
-      val df = with_poly.map({case Array(lon, lat, year, area, thresh, biomass, iso, id1, id2) => (PointsRow(iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
+      val df = with_poly.map({case Array(year, area, thresh, biomass, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (LossRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
                         .toDF()
-                        .groupBy("iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
+                        .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
                         .write
                         .format("csv")
                         .save(conf.get("output.path"))
 
     }
-  }
+  
 
   } finally {
     sc.stop()
