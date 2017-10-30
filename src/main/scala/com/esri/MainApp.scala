@@ -36,6 +36,7 @@ object MainApp extends App {
   // but all the examples I've found use case classes to go from RDD -> DataFrame
   case class ExtentRow( polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, thresh: Long, area: Double)
   case class LossRow(polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
+  case class BiomassRow( polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, Biomass: Double)
 
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
@@ -138,7 +139,7 @@ object MainApp extends App {
                         .format("csv")
                         .save(conf.get("output.path"))
 
-    } else {
+    } else if(conf.get("analysis.type") == "loss") {
       val df = with_poly.map({case Array(year, area, thresh, biomass, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (LossRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
                         .toDF()
                         .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
@@ -147,7 +148,15 @@ object MainApp extends App {
                         .save(conf.get("output.path"))
 
     }
-  
+  else {
+      val df = with_poly.map({case Array(biomass, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (BiomassRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, biomass_per_pixel(biomass)(area))) })
+                        .toDF()
+                        .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2").agg(sum("biomass"))
+                        .write
+                        .format("csv")
+                        .save(conf.get("output.path"))
+
+    }   
 
   } finally {
     sc.stop()
