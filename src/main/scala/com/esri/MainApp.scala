@@ -132,7 +132,7 @@ object MainApp extends App {
   // Can't wait until I write halfway decent scala code
   // And look back at this and wonder what the heck I was thinking
   if(conf.get("analysis.type") == "extent") {
-      val df = with_poly.map({case Array(thresh, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, pkey) => (ExtentRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, matchTest(thresh), area.toDouble)) })
+      val df = with_poly.map({case Array(thresh, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (ExtentRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, matchTest(thresh), area.toDouble)) })
                         .toDF()
                         .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh").agg(sum("area"))
                         .write
@@ -140,7 +140,7 @@ object MainApp extends App {
                         .save(conf.get("output.path"))
 
     } else if(conf.get("analysis.type") == "loss") {
-      val df = with_poly.map({case Array(year, area, thresh, biomass, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, pkey) => (LossRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
+      val df = with_poly.map({case Array(year, area, thresh, biomass, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (LossRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
                         .toDF()
                         .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
                         .write
@@ -149,7 +149,7 @@ object MainApp extends App {
 
     }
   else {
-      val df = with_poly.map({case Array(raw_biomass, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, pkey) => (BiomassRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, biomass_per_pixel(raw_biomass)(area))) })
+      val df = with_poly.map({case Array(raw_biomass, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (BiomassRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, biomass_per_pixel(raw_biomass)(area))) })
                         .toDF()
                         .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2").agg(sum("biomass"))
                         .write
