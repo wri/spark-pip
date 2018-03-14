@@ -131,7 +131,7 @@ object MainApp extends App {
 
   // Can't wait until I write halfway decent scala code
   // And look back at this and wonder what the heck I was thinking
-  if(conf.get("analysis.type") == "extent") {
+  if(Array("extent", "gain") contains conf.get("analysis.type")) {
       val df = with_poly.map({case Array(thresh, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) => (ExtentRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, matchTest(thresh), area.toDouble)) })
                         .toDF()
                         .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh").agg(sum("area"))
