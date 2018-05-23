@@ -3,8 +3,6 @@ import com.vividsolutions.jts.geom._
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory 
 import org.apache.spark.{SparkConf, SparkContext} 
 import org.geotools.geometry.jts.WKTReader2 
-import org.apache.spark.sql._
-import org.apache.spark.rdd.RDD
 
 
 object MainApp extends App {
@@ -19,83 +17,13 @@ object MainApp extends App {
       classOf[RowCol]
     ))
 
-  
-  def matchTest(x: String): Int = x.toInt match {
-    case x if x <= 10 => 0
-    case x if x <= 15 => 10
-    case x if x <= 20 => 15
-    case x if x <= 25 => 20
-    case x if x <= 30 => 25
-    case x if x <= 50 => 30
-    case x if x <= 75 => 50
-    case x if x <= 100 => 75
-    case _ => -9999
-  }
-
-
-  def groupRDDAndSave(analysisType: String, with_poly: RDD[Array[String]], outputPath: String) = {
-
-    // look for either gain or extent, we treat them the same
-    val Pattern = "(gain|extent)".r
-
-    val df = analysisType match {
-      case Pattern(analysisType) => processExtent(with_poly)
-      case "loss" => processLoss(with_poly)
-      case "biomass" => processBiomass(with_poly)
-      case "fire" => processFire(with_poly)
-      case _ => throw new IllegalArgumentException
-    }
-
-    df.write.format("csv").save(outputPath)
-
-  }
-    
-  def biomass_per_pixel(biomass: String)(area: String): Double = { 
-    biomass.toDouble * area.toDouble / 10000.0
-  }
 
   val propFileName = if (args.length == 0) "application.properties" else args(0)
   AppProperties.loadProperties(propFileName, sparkConf)
   val sc = new SparkContext(sparkConf)
-  val sqlContext= new org.apache.spark.sql.SQLContext(sc)
-  import sqlContext.implicits._
-  import org.apache.spark.sql.functions._
 
-  // I'm sure there's a better way to do this
-  // but all the examples I've found use case classes to go from RDD -> DataFrame
-  case class ExtentRow( polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, thresh: Long, area: Double)
-  case class LossRow(polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double)
-  case class BiomassRow( polyname: String, boundary1: String, boundary2: String, boundary3: String, boundary4: String, iso: String, id1: String, id2: String, biomass: Double)
-  case class FireRow( acq_date: String, fire_type: String, polyname: String, boundary1: String, boundary2: String, iso: String, id1: String, id2: String)
-
-  def processExtent(inRDD: RDD[Array[String]]): DataFrame = {
-      inRDD.map({case Array(thresh, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) =>
-                         (ExtentRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, matchTest(thresh), area.toDouble)) })
-                    .toDF()
-                    .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh").agg(sum("area"))
-    }
-
-  def processLoss(inRDD: RDD[Array[String]]): DataFrame = {
-      inRDD.map({case Array(year, area, thresh, biomass, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) =>
-                         (LossRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, year, area.toDouble, matchTest(thresh), biomass_per_pixel(biomass)(area))) })
-                    .toDF()
-                    .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2", "thresh", "year").agg(sum("area"), sum("biomass"))
-    }
-
-  def processBiomass(inRDD: RDD[Array[String]]): DataFrame = {
-      inRDD.map({case Array(raw_biomass, area, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) =>
-                           (BiomassRow(polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2, biomass_per_pixel(raw_biomass)(area))) })
-                    .toDF()
-                    .groupBy("polyname", "boundary1", "boundary2", "boundary3", "boundary4", "iso", "id1", "id2").agg(sum("biomass"))
-    }
-
-  def processFire(inRDD: RDD[Array[String]]): DataFrame = {
-     inRDD.map({case Array(lat, lon, acq_date, fire_type, polyname, boundary1, boundary2, boundary3, boundary4, iso, id1, id2) =>
-                          (FireRow(acq_date, fire_type, polyname, boundary1, boundary2, iso, id1, id2 )) })
-                    .toDF()
-                    .groupBy("acq_date", "fire_type", "polyname", "boundary1", "boundary2", "iso", "id1", "id2").count()
-    }
-
+  // initialize sqlContext - will be used if analysis.type set in application.properties
+  implicit val sqlContext= new org.apache.spark.sql.SQLContext(sc)
 
   try {
     val conf = sc.getConf
@@ -187,7 +115,7 @@ object MainApp extends App {
       // if it's a known analysis, we'll do some more processing here in scala
       val validAnalyses = Array("extent", "gain", "loss", "biomass", "fire")
       if (validAnalyses contains analysisType) {
-        groupRDDAndSave(analysisType, with_poly, outputPath)
+        Summary.groupRDDAndSave(analysisType, with_poly, outputPath)
 
       // otherwise we'll write the entire point + polygon attributes table to hadoop
       } else {
@@ -200,5 +128,4 @@ object MainApp extends App {
     sc.stop()
   }
 }
-
 
