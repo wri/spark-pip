@@ -15,6 +15,11 @@ object HansenUtils {
     case _ => -9999
   }
 
+  // Woods Hole biomass 2000 v4 map biomass units: megagrams biomass/hectare
+  // Units for biomass tiles that go into tsv creation: megagrams biomass/hectare
+  // Units for biomass in tsvs that go into Hadoop: megagrams biomass/hectare
+  // Units for biomass that come out of Hadoop: megagrams biomass/pixel
+  // Thus, the below function converts megagrams biomass/hectare to megagrams biomass/pixel.
   def biomass_per_pixel(biomass: String)(area: String): Double = { 
     biomass.toDouble * area.toDouble / 10000.0
   }
