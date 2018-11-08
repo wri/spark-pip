@@ -3,7 +3,7 @@ package com.esri
 object HansenUtils {
   
   def matchTest(x: String): Int = x.toInt match {
-    case x if x <= 0 => -1
+    case x if x < 0 => -9999
     case x if x <= 10 => 0
     case x if x <= 15 => 10
     case x if x <= 20 => 15

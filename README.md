@@ -1,195 +1,91 @@
 # Spark Point In Polygon
 
-[Spark](http://spark.apache.org/) job to perform massive Point in Polygon (PiP) operations on a distributed share-nothing cluster.
+This repo is the result of a collaboration between the GFW technical staff and Mansour Raad.
+Mansour developed this hadoop / point-in-polygon system - see his [original repo](http://github.com/mraad/spark-pip)
+for more information. The original README is also available here in docs/technical_readme.md
 
-In this job context, a feature is defined to have a geometry and a set of attributes. The geometry can be
-a point, a polygon or a multi-polygon, and an attribute is a string encoded value. 
+On top of his original framework we've added a few GFW-specific summary processes- looking
+up a tree cover density threshold from a tree cover value, for example, or multiplying a biomass
+value by area to get emissions per pixel.
 
-The job takes 2 inputs, a path to a set of files containing point features and a path to a set of files containing polygon features.
-The job iterates through every point feature and identifies which polygon it is inside of and then emits a union of user-defined
-attributes from the point feature and the polygon feature. 
- 
-In this current implementation, each point feature is read from a field delimited text file where the x and y coordinates are double-typed fields.
-And each polygon feature is also read from a field delimited text file where the coordinates are defined in a [WKT](https://en.wikipedia.org/wiki/Well-known_text) format.
+### Inputs
 
-Here is a point feature sample:
-
-```
-111.509,80.9801,7.07783,R14
-```
-
-And here is polygon feature sample:
+#### Points
+Points are stored in TSV format, usually in an S3 directory
+Here's an example from our loss data:
 
 ```
-0|EC02|ECU-AZU|Azuay|EC|ECU|Ecuador|555881|Province|Provincia|8788.83|3393.37|1|0|MULTIPOLYGON (((-79.373981904060528 -3.3344269140348786, ...
+-89.945375      0.313625        12      769.305779374   0       4
 ```
 
-Note that in the above sample, the geometry point fields are separated by a comma, where the feature fields are separated by a pipe `|`.
-The delimited characters can be defined at execution time.
+This is a loss point at (-89.945375, 0.313625) with loss occurring in 2012,
+a pixel area of 769.305779374 m2 (based on pixel latitude), a TCD value of 0
+and a biomass value of 4.
 
-__Update: Nov 4, 2016__
+Current loss point data is stored here: s3://gfw2-data/alerts-tsv/loss_2017/
 
-- JDK 8 is a requirement.
-- Updated the map phase where, rather than sending to the reducer the whole geometry for each grid cell key, now the _clipped_ geometry for a cell is sent to the reduce phase.  This minimizes the memory consumption and the network traffic by transferring smaller geometries.
-- Updated Docker content to Spark 1.6.2 and JDK 8 to accommodate the clip function in `org.geotools:gt-main:15.2`.
+#### Polygons
+Polygons are also stored in TSV format in an S3 directory.
 
-## Building the Project
-
-The build process uses [Maven](https://maven.apache.org/)
-
-```shell
-mvn package
+Example:
+```
+POLYGON ((139.772662922 -7.33645210899988,139.772136831 -7.33645210899988,139.772136831 -7.33519300899997,139.772662922 -7.33645210899988))     plantations__wood_fiber Unknown Clearing/ Very Young Plantation 1       1       IDN     23      15      2
 ```
 
-This will create a Spark jar in the `target` folder, and any runtime jar dependencies, will be copied to the `target/libs` folder.
+This particular polygon is an intersection of our plantations and wood fiber data. The first column is the geometry,
+then the name of the dataset, then some plantations specific info (Unknown species type, Clearing / young plantation size), then two placeholder fields (1, 1) for wood fiber info. After that we have the iso/adm1/adm2 column, and then a TSV count column (not actually used).
 
-## Configuring the job
+Current polygon data is stored here: s3://gfw2-data/alerts-tsv/country-pages/ten-by-ten-gadm36/
 
-The job can accept a command line argument that is a file in a [properties format](http://docs.oracle.com/cd/E23095_01/Platform.93/ATGProgGuide/html/s0204propertiesfileformat01.html).
-If no argument is found, then it tries to load a file named `applications.properties` from the current directory.
+## Configuring the application
 
-Key|Description|Default Value
----|-----------|-------------
-geometry.precision | The geometry factory precision | 1000000.0
-extent.xmin | minimum horizontal bounding box filter | -180.0
-extent.xmax | maximum horizontal bounding box filter | 180.0
-extent.ymin | minimum vertical bounding box filter | -90.0
-extent.ymax | maximum vertical bounding box filter | 90.0
-points.path | path of point features | must be defined
-points.sep | the points field character separator | tab
-points.x | the index of the horizontal point coordinate | 0
-points.y | the index of the vertical point coordinate | 1
-points.fields | comma separated list of field value indexes to emit | empty
-polygons.path | path of polygon features | must be defined
-polygons.sep | the polygons field character separator | tab
-polygons.wky | the index of the WKT field | 0
-output.path | path where to write the emitted fields | must be defined
-output.sep | the output fields character separator | tab
-reduce.size | the grid size of the spatial join (see below for details) | 1.0
+By default, the application will look for an application.properties file to get it's input and output datasets. See our example application.properties for sample inputs and commentary about the various parameters.
 
-The file can also include [Spark configuration properties](http://spark.apache.org/docs/latest/configuration.html)
- 
-## Implementation details
- 
-The data can be massive and cannot fit in memory all at once to perform the PiP operations and to create
-a spatial index of all the polygons for quick lookup. So...you will have to segment the input data and operate on 
-each segment individually.  And since these segments share nothing, they can be processed in parallel.
-In the geospatial domain, segmentation takes the form of subdividing the area of interest into small rectangular areas.
-Rectangles are "nice", as you can quickly find out if a point is inside of it or outside of it,
-and polygonal shapes can be subdivided into coarse edge matching rectangles. It is that last feature that we will use to segment the input
-points and polygons, in such that that we can perform a massive PiP per segment/rectangle.
+## Updating the code
 
-Take for example the below points and polygons in an area of interest.
+General scala development is beyond the scope of this README, but provided you have scala, spark and [maven](https://maven.apache.org/) installed, you should be able to run and test code locally. I wouldn't recommend this on a Windows machine, but should be pretty straightforward to install on linux or mac. My workflow usually has the following steps:
 
-![](media/AOI.png)
+1. Make changes to the code
+2. Test to see if things compile using `mvn complile`
+3. If they do, run `mvn package` - this will create the output `target/` folder
+4. To test locally, update `local.properties` to point to TSVs on your machine, then run `./local.sh`.
 
-Feature Polygon A can be segmented into (0,1) (0,2) (0,3) (1,1) (1,2) (1,3) (2,1) (2,2) (2,3).
+To run on a hadoop cluster, copy this `target` folder to the master machine, then follow the `starting a job` steps below.
 
-Feature Polygon B can be segmented into (1,0) (1,1) (2,0) (2,1) because of its _bounding box_.
- 
-Feature Polygon C can be segmented into (3,1) (3,2).
+## Custom GFW code
 
-Feature Point A can be segmented into (1,3).
+If you are modifying the code, odds are you want to add a new analysis.type, or change one of the existing ones. Most of this logic is contained in Summarize.scala, with additional utilities in HansenUtils.scala.
 
-Feature Point B can be segmented into (1,2).
+It may seem complicated, but it's pretty straightforward. Most of what we're doing is taking the output attribute table (points + polygon attributes), grouping by the data we want to keep (polyname, loss_year, boundary info, GADM data), summing the other stuff (area, emissions) and saving to CSV.
 
-Feature Point C can be segmented into (1,0).
+## Starting a job
 
-Feature Point D can be segmented into (3,0).
-
-The features are now encapsulated by their segments and are operated on in parallel.
-  
-Segment (1,2) has Polygon A and Point B. And since Point B is inside Polygon A then, the selected attributed of Point B and the selected attributes of Polygon A will be written to the output file.
-
-In the case of Segment (1,3), it contains Polygon A and Point A. However, because Point A is _not_ inside Polygon A, then nothing is written out.
-
-In this implementation, the rectangle is actually square, and the size of the square (the segmentation area) is defined by the `reduce.size` properties.
-This value is very data specific and you might have to run the job a multiple times with different values while tracking the execution time to determine the "sweet spot".
-
-![](media/SweetSpot.png)
-
-## Running the job
-
-It is assumed that Spark was [downloaded](http://spark.apache.org/downloads.html) and installed in a folder that is hereon referred to as `${SPARK_HOME}`
-
-Unzip `data/points.tsv.zip` and `data/world.tsv.zip` into the `/tmp` folder.
-
-`points.tsv` is a 1,000,000 randomly generated points and `world.tsv` contains the world administrative polygons.
-
-## Run In Local Mode
+We don't start too many jobs manually (most repos that use this call `spark-submit` with a subprocess). If you do need to call it manually, this should get you started:
 
 ```
-${SPARK_HOME}/bin/spark-submit\
- target/spark-pip-0.3.jar\
- local.properties
+spark-submit --master yarn --executor-memory 20g --jars target/libs/jts-core-1.14.0.jar target/spark-pip-0.3.jar
 ```
 
-The output can be viewed using:
+This assumes that you've compiled the repo into a target folder as described above, and that you have a relatively beefy cluster that can handle 20 GB of memory per executor. For smaller clusters, we usually run `9g` of memory.
 
-```
-more /tmp/output/part-*
-```
+## Outputs
 
-## Run on a Hadoop Cluster
+Outputs vary depending on the analysis.type specified (if any). If the analysis.type is loss, our output will look something like this:
 
-For testing purposes, a Hadoop pseudo cluster can be created using [Docker](https://www.docker.com/) with HDFS, YARN and Spark.
-Check out [README.md](docker/README.md) in the `docker` folder.
+| polyname           | bound1 | bound2 | bound3 | bound4 | iso | adm1 | adm2 | thresh | loss_year | area          | emissions     |
+|--------------------|--------|--------|--------|--------|-----|------|------|--------|-----------|---------------|---------------|
+| admin              | 1      | 1      | 1      | 1      | BRA | 12   | 9    | 0      | 16        | 5003144.59559 | 1875.79985949 |
+| ifl_2013__landmark | 1      | 1      | 1      | 1      | BRA | 12   | 9    | 75     | 11        | 1028353.82939 | 24374.7669306 |
+| ifl_2013__landmark | 1      | 1      | 1      | 1      | BRA | 12   | 9    | 30     | 3         | 761.110102908 | 3.88166152483 |
 
-In the _top level_ cloned folder, execute:
+This output is grouped by polyname, our bound fields, iso/adm1/adm2, loss_year and threshold, summing area and emissions. This allows us to pull a relatively small file (< 1 GB) down for post-processing.
 
-```
-docker run\
-  -it\
-  --rm=true\
-  --volume=$(pwd):/spark-pip\
-  -h boot2docker\
-  -p 8088:8088\
-  -p 9000:9000\
-  -p 50010:50010\
-  -p 50070:50070\
-  -p 50075:50075\
-  mraad/hdfs\
-  /etc/bootstrap.sh
-```
+## GFW repos that use this process
 
-Put the supporting data in HDFS:
+#### GFW Annual Loss Processing
+[This repo](https://github.com/wri/gfw-annual-loss-processing/) manages our entire yearly loss update. It uses the various custom analysis.type options - loss, gain, extent, biomass, etc - to tabulate yearly summary statistics.
 
-```
-hdfs dfsadmin -safemode wait
-unzip -p /spark-pip/data/world.tsv.zip | hdfs dfs -put - /world/world.tsv
-unzip -p /spark-pip/data/points.tsv.zip | hdfs dfs -put - /points/points.tsv
-```
+#### Hadoop PIP
+[This repo](https://github.com/wri/hadoop_pip) starts an EMR cluster from a user's local machines, waits for the cluster to be ready, then passes a config file to it to start a processing step. Hadoop_PIP can be used on it's own for one-off analysis, and is also called by our [country-pages code](https://github.com/wri/gfw-country-pages-analysis-2/) and [places-to-watch](https://github.com/wri/gfw-places-to-watch/) code.
 
-The following reads by default the application properties from the file `application.properties` in the current folder if no file argument is passed along. 
-
-```
-cd /spark-pip
-hdfs dfs -rm -r -skipTrash /output
-time spark-submit\
- --master yarn-client\
- --driver-memory 512m\
- --num-executors 2\
- --executor-cores 1\
- --executor-memory 2g\
- target/spark-pip-0.3.jar
-```
-
-## View Data in HDFS
-
-The output of the previous job resides in HDFS as CSV text files in `hdfs://boot2docker:9000/output/part-*`.
-This form of output from a BigData job is what I term *GIS Data* and needs to be visualized.
-The HDFS configuration in the docker container has the [WebHDFS](https://hadoop.apache.org/docs/r1.0.4/webhdfs.html) REST API enabled.
-
-```xml
-<property>
-    <name>dfs.webhdfs.enabled</name>
-    <value>true</value>
-</property>
-```
-
-The `PiPToolbox` ArcPy toolbox contains `Load Points` as a tool to open and read the content of CSV files in HDFS and
-converts each row into a feature in an in-memory feature class.
-
-![](media/WebHDFSTool.png)
-
-![](media/ArcMap.png)
+It should be noted that in the case of hadoop_pip, we usually don't use a particular analysis.type property. For these applications, we write the entire joined (points + polygons) attribute table to HDFS storage, then read it into a dataframe and perform custom SQL to further summarize it. More information can be found in the [hadoop_pip repo](https://github.com/wri/hadoop_pip).
