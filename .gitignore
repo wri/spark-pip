@@ -1,6 +1,5 @@
 metastore_db/
 target/
-<<<<<<< HEAD
 lib_managed/
 src_managed/
 project/boot/
@@ -11,11 +10,9 @@ project/plugins/project/
 .worksheet
 
 .idea
+dependency-reduced-pom.xml
 
 data/
-=======
 .idea/
 src/main/python/*.xml
-dependency-reduced-pom.xml
 *.iml
->>>>>>> upstream/master
