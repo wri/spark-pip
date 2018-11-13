@@ -12,7 +12,7 @@ project/plugins/project/
 .idea
 dependency-reduced-pom.xml
 
-data/
+data/output/
 .idea/
 src/main/python/*.xml
 *.iml
