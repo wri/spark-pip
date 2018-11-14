@@ -45,6 +45,8 @@ object Summary {
 
   def processLoss(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
+    println("Hello. WE ARE HERE NOW.")
+    
     import sqlContext.implicits._
     inRDD.map({case Array(year, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (LossRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2, 
