@@ -122,6 +122,8 @@ object Summary {
 
   def processAnnualGain(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
+    println("Hello. I AM CURRENTLY HERE.")
+
     import sqlContext.implicits._
     inRDD.map({case Array(annGain, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
