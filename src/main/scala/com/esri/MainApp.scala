@@ -113,7 +113,7 @@ object MainApp extends App {
       })
 
       // if it's a known analysis, we'll do some more processing here in scala
-      val validAnalyses = Array("extent", "gain", "loss", "biomass", "fire")
+      val validAnalyses = Array("extent", "gain", "loss", "biomass", "fire", "grossEmis", "netEmis")
       if (validAnalyses contains analysisType) {
         Summary.groupRDDAndSave(analysisType, with_poly, outputPath)
 

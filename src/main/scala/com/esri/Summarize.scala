@@ -17,6 +17,8 @@ object Summary {
       case "biomass" => processBiomass(with_poly)
       case "fire" => processFire(with_poly)
       case "glad" => processGLAD(with_poly)
+      case "grossEmis" => processGrossEmis(with_poly)
+      case "netEmis" => processNetEmis(with_poly)
       case _ => throw new IllegalArgumentException
     }
 
@@ -53,11 +55,11 @@ object Summary {
   def processBiomass(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(raw_biomass, area, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
-              (BiomassRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2, 
+    inRDD.map({case Array(raw_biomass, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (BiomassRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2, HansenUtils.matchTest(thresh),
                           HansenUtils.biomass_per_pixel(raw_biomass)(area))) })
               .toDF()
-              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2")
+              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
               .agg(sum("biomass"))
     }
 
@@ -82,6 +84,29 @@ object Summary {
               .agg(sum("area_m2"), sum("emissions"))
     }
 
+
+  def processGrossEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
+
+    import sqlContext.implicits._
+    inRDD.map({case Array(year, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (grossEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+                       year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(grossEmissions)(area))) })
+              .toDF()
+              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh", "year")
+              .agg(sum("area"), sum("grossEmissions"))
+    }
+
+  def processNetEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
+
+    import sqlContext.implicits._
+    inRDD.map({case Array(year, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (netEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+                       year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(netEmissions)(area))) })
+              .toDF()
+              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
+              .agg(sum("area"), sum("netEmissions"))
+    }
+
   case class ExtentRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String, 
                         iso: String, id1: String, id2: String, thresh: Long, area: Double )
 
@@ -89,13 +114,19 @@ object Summary {
                       iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, biomass: Double )
 
   case class BiomassRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String, 
-                         iso: String, id1: String, id2: String, biomass: Double )
+                         iso: String, id1: String, id2: String, thresh: Long, biomass: Double )
   
   case class FireRow( acq_date: String, fire_type: String, polyname: String, bound1: String, bound2: String, 
                       iso: String, id1: String, id2: String )
 
   case class GLADRow( confidence: String, year: String, julian_day: String, climate_mask: String, polyname: String, 
                       bound1: String, bound2: String, iso: String, id1: String, id2: String, area_m2: Double, emissions: Double )
+
+  case class grossEmisRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
+                           iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, grossEmissions: Double )
+
+  case class netEmisRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
+                         iso: String, id1: String, id2: String, area: Double, thresh: Long, netEmissions: Double )
 
 
 }
