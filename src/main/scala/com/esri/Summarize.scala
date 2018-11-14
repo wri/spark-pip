@@ -107,6 +107,28 @@ object Summary {
               .agg(sum("area"), sum("netEmissions"))
     }
 
+  def processCumulGain(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
+
+    import sqlContext.implicits._
+    inRDD.map({case Array(area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (netEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(annualGain)(area))) })
+              .toDF()
+              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
+              .agg(sum("area"), sum("annualGain"))
+    }
+
+  def processAnnualGain(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
+
+    import sqlContext.implicits._
+    inRDD.map({case Array(area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (netEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(cumulGain)(area))) })
+              .toDF()
+              .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
+              .agg(sum("area"), sum("cumulGain"))
+    }
+
   case class ExtentRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String, 
                         iso: String, id1: String, id2: String, thresh: Long, area: Double )
 
@@ -127,6 +149,12 @@ object Summary {
 
   case class netEmisRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
                          iso: String, id1: String, id2: String, area: Double, thresh: Long, netEmissions: Double )
+
+  case class cumulGainRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
+                           iso: String, id1: String, id2: String, area: Double, thresh: Long, cumulGain: Double )
+
+  case class annualGainRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
+                            iso: String, id1: String, id2: String, area: Double, thresh: Long, annualGain: Double )
 
 
 }
