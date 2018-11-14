@@ -125,8 +125,7 @@ object Summary {
     import sqlContext.implicits._
     inRDD.map({case Array(annGain, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
-                       area.toDouble, HansenUtils.matchTest(thresh), annGain)) })
-                       // area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(annGain)(area))) })
+                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.annGain_per_pixel(annGain)(area))) })
               .toDF()
               .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
               .agg(sum("area"), sum("annGain"))
