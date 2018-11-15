@@ -102,7 +102,7 @@ object Summary {
 
     import sqlContext.implicits._
     inRDD.map({case Array(netEmis, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
-              (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+              (netEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
                        area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(netEmis)(area))) })
               .toDF()
               .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
