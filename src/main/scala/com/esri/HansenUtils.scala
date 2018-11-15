@@ -24,8 +24,4 @@ object HansenUtils {
     biomass.toDouble * area.toDouble / 10000.0
   }
 
-  def annGain_per_pixel(annGain: String)(area: String): Double = {
-    annGain.toDouble * area.toDouble / 10000.0
-  }
-
 }

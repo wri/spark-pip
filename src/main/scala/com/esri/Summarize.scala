@@ -90,7 +90,7 @@ object Summary {
   def processGrossEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(year, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+    inRDD.map({case Array(grossEmissions, area, thresh, year, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (grossEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
                        year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(grossEmissions)(area))) })
               .toDF()
@@ -101,7 +101,7 @@ object Summary {
   def processNetEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+    inRDD.map({case Array(netEmissions, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (netEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
                        area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(netEmissions)(area))) })
               .toDF()
@@ -125,7 +125,7 @@ object Summary {
     import sqlContext.implicits._
     inRDD.map({case Array(annGain, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
-                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.annGain_per_pixel(annGain)(area))) })
+                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(annGain)(area))) })
               .toDF()
               .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
               .agg(sum("area"), sum("annGain"))
