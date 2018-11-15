@@ -90,7 +90,7 @@ object Summary {
   def processGrossEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(grossEmis, area, thresh, year, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+    inRDD.map({case Array(grossEmis, area, thresh, year, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (grossEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
                        year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(grossEmis)(area))) })
               .toDF()
