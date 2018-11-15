@@ -90,12 +90,12 @@ object Summary {
   def processGrossEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(grossEmissions, area, thresh, year, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+    inRDD.map({case Array(grossEmis, area, thresh, year, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (grossEmisRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
-                       year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(grossEmissions)(area))) })
+                       year, area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.biomass_per_pixel(grossEmis)(area))) })
               .toDF()
               .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh", "year")
-              .agg(sum("area"), sum("grossEmissions"))
+              .agg(sum("area"), sum("grossEmis"))
     }
 
   def processNetEmis(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
@@ -147,10 +147,10 @@ object Summary {
                       bound1: String, bound2: String, iso: String, id1: String, id2: String, area_m2: Double, emissions: Double )
 
   case class grossEmisRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
-                           iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, grossEmissions: Double )
+                           iso: String, id1: String, id2: String, year: String, area: Double, thresh: Long, grossEmis: Double )
 
   case class netEmisRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
-                         iso: String, id1: String, id2: String, area: Double, thresh: Long, netEmissions: Double )
+                         iso: String, id1: String, id2: String, area: Double, thresh: Long, netEmis: Double )
 
   case class cumulGainRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String,
                            iso: String, id1: String, id2: String, area: Double, thresh: Long, cumGain: Double )
