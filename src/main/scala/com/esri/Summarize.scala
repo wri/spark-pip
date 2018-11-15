@@ -45,8 +45,6 @@ object Summary {
 
   def processLoss(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
-    println("Hello. WE ARE HERE NOW.")
-    
     import sqlContext.implicits._
     inRDD.map({case Array(year, area, thresh, biomass, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
               (LossRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2, 
@@ -125,12 +123,12 @@ object Summary {
   def processAnnualGain(inRDD: RDD[Array[String]])(implicit sqlContext: SQLContext): DataFrame = {
 
     import sqlContext.implicits._
-    inRDD.map({case Array(raw_biomass, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
-              (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2, HansenUtils.matchTest(thresh),
-                          HansenUtils.biomass_per_pixel(raw_biomass)(area))) })
+    inRDD.map({case Array(annGain, area, thresh, polyname, bound1, bound2, bound3, bound4, iso, id1, id2) =>
+              (annualGainRow(polyname, bound1, bound2, bound3, bound4, iso, id1, id2,
+                       area.toDouble, HansenUtils.matchTest(thresh), HansenUtils.annGain_per_pixel(annGain)(area))) })
               .toDF()
               .groupBy("polyname", "bound1", "bound2", "bound3", "bound4", "iso", "id1", "id2", "thresh")
-              .agg(sum("biomass"))
+              .agg(sum("area"), sum("annGain"))
     }
 
   case class ExtentRow( polyname: String, bound1: String, bound2: String, bound3: String, bound4: String, 
